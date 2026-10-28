@@ -63,7 +63,7 @@ void MX_USART2_UART_Init(void)
   /* USART2_RX Init */
   LL_DMA_SetDataTransferDirection(DMA1, LL_DMA_CHANNEL_6, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
   LL_DMA_SetChannelPriorityLevel(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PRIORITY_MEDIUM);
-  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MODE_CIRCULAR);
+  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MODE_NORMAL);
   LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PERIPH_NOINCREMENT);
   LL_DMA_SetMemoryIncMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MEMORY_INCREMENT);
   LL_DMA_SetPeriphSize(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PDATAALIGN_BYTE);
@@ -138,27 +138,24 @@ void USART2_CheckDmaReception(void)
 
 	uint16_t pos = DMA_USART2_BUFFER_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_6);
 
-	if (pos != old_pos)
-	{
-		if (pos > old_pos)
-		{
-			USART2_ProcessData(&bufferUSART2dma[old_pos], pos - old_pos);
-		}
-		else
-		{
-			USART2_ProcessData(&bufferUSART2dma[old_pos], DMA_USART2_BUFFER_SIZE - old_pos);
 
-			if (pos > 0)
-			{
-				USART2_ProcessData(&bufferUSART2dma[0], pos);
-			}
-		}
+	if (pos > old_pos)
+	{
+		USART2_ProcessData(&bufferUSART2dma[old_pos], pos - old_pos);
+		old_pos = pos;
+
 	}
 
-	old_pos = pos;
-
-	if (old_pos == DMA_USART2_BUFFER_SIZE)
+	if ((DMA_USART2_BUFFER_SIZE - pos) <= DMA_USART2_MAX_MSG_LEN)
 	{
+		LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_6);
+
+		while (LL_DMA_IsEnabledChannel(DMA1, LL_DMA_CHANNEL_6));
+
+		LL_DMA_ClearFlag_GI6(DMA1);
+		LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_6, DMA_USART2_BUFFER_SIZE);
+		LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_6);
+
 		old_pos = 0;
 	}
 }

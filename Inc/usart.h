@@ -31,7 +31,9 @@
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN Private defines */
-#define DMA_USART2_BUFFER_SIZE 64
+#define DMA_USART2_BUFFER_SIZE 128
+#define DMA_USART2_MAX_MSG_LEN 20
+
 
 /* USER CODE END Private defines */
 
