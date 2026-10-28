@@ -11,8 +11,11 @@
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_ll_bus.h:867:22:LL_APB2_GRP1_EnableClock	24	static
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_ll_system.h:1634:22:LL_FLASH_SetLatency	16	static
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_ll_system.h:1647:26:LL_FLASH_GetLatency	4	static
+../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_ll_cortex.h:247:26:LL_SYSTICK_IsActiveCounterFlag	4	static
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_ll_cortex.h:260:22:LL_SYSTICK_SetClkSource	16	static
-../Src/main.c:71:5:main	8	static
-../Src/main.c:132:6:SystemClock_Config	8	static
-../Src/main.c:164:6:receive_dma_data	24	static
-../Src/main.c:181:6:Error_Handler	4	static
+../Src/main.c:85:5:main	8	static
+../Src/main.c:145:6:SystemClock_Config	8	static
+../Src/main.c:177:6:proccesDmaData	24	static
+../Src/main.c:231:13:sendValidString	176	static,ignoring_inline_asm
+../Src/main.c:253:13:sendBufferStatus	168	static
+../Src/main.c:284:6:Error_Handler	4	static

@@ -19,9 +19,12 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
+#include <stdio.h>
+#include <string.h>
 
 /* USER CODE BEGIN 0 */
 uint8_t bufferUSART2dma[DMA_USART2_BUFFER_SIZE];
+static uint8_t bufferUSART2tx[DMA_USART2_TX_BUFFER_SIZE];
 
 static void (* USART2_ProcessData)(const uint8_t* data, uint16_t len) = 0;
 
@@ -120,12 +123,16 @@ void MX_USART2_UART_Init(void)
 
 void USART2_PutBuffer(uint8_t *buffer, uint8_t length)
 {
-	LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_7, (uint32_t)buffer);
+	while (LL_DMA_IsEnabledChannel(DMA1, LL_DMA_CHANNEL_7) && LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_7) > 0);
 
+	LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_7);
+	LL_DMA_ClearFlag_TC7(DMA1);
+
+	memcpy(bufferUSART2tx, buffer, length);
+
+	LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_7, (uint32_t)bufferUSART2tx);
 	LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_7, length);
-
 	LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_7);
-
 	LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_7);
 }
 
@@ -162,7 +169,10 @@ void USART2_CheckDmaReception(void)
 
 
 /* USER CODE BEGIN 1 */
-
+uint16_t USART2_GetDmaRxOccupied(void)
+{
+	return DMA_USART2_BUFFER_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_6);
+}
 /* USER CODE END 1 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

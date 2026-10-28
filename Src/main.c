@@ -26,7 +26,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +37,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define START_CHAR '#'
+#define END_CHAR '$'
+#define MAX_CHARS 35
 
+#define REPORT_PERIOD_MS 2000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,16 +52,25 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-  uint8_t tx_data[] = "Data to send over UART DMA!\n\r";
-  uint8_t rx_data[10];
-  uint8_t count = 0;
+static uint8_t frameActive = 0;
+static uint8_t frameCount  = 0;
+static uint8_t frameLower  = 0;
+static uint8_t frameUpper  = 0;
+static char frameBuf[MAX_CHARS + 2];
 
+static volatile uint8_t resultReady = 0;
+static uint8_t resultLower = 0;
+static uint8_t resultUpper = 0;
+static char resultFrame[MAX_CHARS + 2];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void receive_dma_data(const uint8_t* data, uint16_t len);
+void proccesDmaData(const uint8_t* data, uint16_t len);
+uint16_t USART2_GetDmaRxOccupied(void);
+static void sendValidString(void);
+static void sendBufferStatus(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -71,7 +85,6 @@ void receive_dma_data(const uint8_t* data, uint16_t len);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
   
 
@@ -102,7 +115,7 @@ int main(void)
   MX_DMA_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  USART2_RegisterCallback(receive_dma_data);
+  USART2_RegisterCallback(proccesDmaData);
 
   /* USER CODE END 2 */
 
@@ -114,11 +127,11 @@ int main(void)
 #if POLLING
 	//Polling for new data, no interrupts
 	USART2_CheckDmaReception();
-	LL_mDelay(10);
-#else
-	USART2_PutBuffer(tx_data, sizeof(tx_data));
-	LL_mDelay(1000);
+
 #endif
+
+	sendValidString();
+	sendBufferStatus();
 
     /* USER CODE BEGIN 3 */
   }
@@ -161,16 +174,104 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-void receive_dma_data(const uint8_t* data, uint16_t len)
+void proccesDmaData(const uint8_t* data, uint16_t len)
 {
-    for(uint8_t i = 0; i < len; i++)
-    {
-    	if(*(data+i) == '1')
+	for (uint16_t i = 0; i < len; i++)
+	{
+		char c = (char)data[i];
+
+		if (c == START_CHAR)
 		{
-			count++;
+			frameActive = 1;
+			frameCount  = 0;
+			frameLower  = 0;
+			frameUpper  = 0;
+			frameBuf[0] = START_CHAR;
+			continue;
 		}
-    }
+
+		if (!frameActive)
+		{
+			continue;
+		}
+
+		frameBuf[1 + frameCount] = c;
+		frameCount++;
+
+		if (c == END_CHAR)
+		{
+			frameBuf[1 + frameCount] = '\0';
+
+			strcpy(resultFrame, frameBuf);
+			resultLower = frameLower;
+			resultUpper = frameUpper;
+			resultReady = 1;
+
+			frameActive = 0;
+			continue;
+		}
+
+		if (c >= 'a' && c <= 'z')
+		{
+			frameLower++;
+		}
+		else if (c >= 'A' && c <= 'Z')
+		{
+			frameUpper++;
+		}
+
+		if (frameCount >= MAX_CHARS)
+		{
+			frameActive = 0;
+		}
+	}
 }
+
+
+static void sendValidString(void)
+{
+	if (!resultReady) return;
+
+	char    frame[MAX_CHARS + 2];
+	uint8_t lower, upper;
+	char    msg[100];
+
+	__disable_irq();
+	strcpy(frame, resultFrame);
+	lower = resultLower;
+	upper = resultUpper;
+	resultReady = 0;
+	__enable_irq();
+
+
+	int n = sprintf(msg, "Valid string: %.*s, lower-case: %u, upper-case: %u\r\n",
+	                (int)strlen(frame) - 2, frame + 1, lower, upper);
+	USART2_PutBuffer((uint8_t *)msg, (uint8_t)n);
+}
+
+
+static void sendBufferStatus(void)
+{
+	static uint32_t msCounter = 0;
+
+	if (LL_SYSTICK_IsActiveCounterFlag())
+	{
+		msCounter++;
+	}
+
+	if (msCounter < REPORT_PERIOD_MS) return;
+	msCounter = 0;
+
+	uint16_t occupied = USART2_GetDmaRxOccupied();
+	uint32_t load10   = ((uint32_t)occupied * 1000U) / DMA_USART2_BUFFER_SIZE;
+	char     msg[128];
+
+	int n = sprintf(msg, "Buffer capacity: %u bytes, occupied memory: %u bytes, load [in %%]: %lu.%lu%%\r\n",
+	                (unsigned)DMA_USART2_BUFFER_SIZE, occupied,
+	                (unsigned long)(load10 / 10), (unsigned long)(load10 % 10));
+	USART2_PutBuffer((uint8_t *)msg, (uint8_t)n);
+}
+
 
 /* USER CODE END 4 */
 
